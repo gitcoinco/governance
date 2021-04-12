@@ -1,4 +1,3 @@
 # Gitcoin Governance Docs 
 
-- (Contract Deployment Guide)[/DEPLOYMENT-GUIDE.md]
-- 
+1) [Contract Deployment Guide with Brownie](/DEPLOYMENT-GUIDE.md)
