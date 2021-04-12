@@ -6,6 +6,11 @@ For our milestone one release we establish the foundational components of decent
 
 The GTC token distribution event will be front lined by the Quadratic Lands experience. The [Quadratic Lands](https://gitcoin.co/quadraticlands) is an portal to decentralized GTC Token governance where the Gitcoin community can interact with the governance system.  
 
+## Contract Deployment & Admin Guides: 
+
+Here you can find a guide on [how to deploy the Gitcoin governance contracts with Brownie](docs/DEPLOYMENT-GUIDE.md). Other guides can be found directly [in the /docs](/docs/README.md) directory. 
+
+
 # Primary Contracts 
 
 1) GTC.sol - ERC20 contract for the GTC Token forked from [Uni.sol](https://github.com/Uniswap/governance/blob/master/contracts/Uni.sol)
@@ -46,9 +51,6 @@ You can explore live Rinkeby blockchain data for the GovernorAlpha contract on t
 
 ---
 
-### Deployment & Admin Guides: 
-
-[How to deploy contracts with Brownie](docs/deployment-guide.md) or all other guides can be found [in the /docs](/docs) directory. 
 
 
 
