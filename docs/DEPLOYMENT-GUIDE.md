@@ -27,6 +27,21 @@ This will launch a local Etheruem test/dev chain using `ganach-cli`. Next, from 
 >>> run('deploy-all')
 ```
 
+## Deploying Governance Contract to Rinkeby
+TODO
+
+
+## Running MythX Scan
+Running a MythX scan with Brownie is as simple as setting your MythX API key:
+
+` export MYTHX_API_KEY='your-really-long-api-key-goes-here'`
+
+The from your contracts directory you can simply run:
+
+`brownie analyze` 
+
+More info on configuration options and accessing scan results can be found in the [Brownie docs](https://eth-brownie.readthedocs.io/en/stable/tests-security-analysis.html#security-analysis-with-mythx). 
+
 ---
 
 
