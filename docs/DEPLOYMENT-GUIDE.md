@@ -12,7 +12,7 @@ One nice thing about Brownie is that you can install it using pipx and it will i
 
 2) `network-config.yaml` - While network configurations can also be put in brownie-config.yaml it's a good idea to put your network configs outside your repo directory as it will likely contain some private info. By default, Brownie will install a network-config file in `~/.brownie/network-config.yaml`
 
-You can set your things like Infura keys and test mnemonics in your local network-config.yaml so you don't have to manually set them with environment variables. 
+You can set things like Infura keys and test mnemonics in your local network-config.yaml so you don't have to manually set them with environment variables. 
 
 ## Deploy Governance Contracts Locally 
 
