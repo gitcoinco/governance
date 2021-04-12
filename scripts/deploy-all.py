@@ -1,4 +1,4 @@
-from brownie import accounts, web3, GTC, TokenVesting, TokenDistributor, Timelock, GovernorAlpha, Wei
+from brownie import accounts, web3, GTA, TokenDistributor, Timelock, GovernorAlpha, TreasuryVester, Wei
 import time
 import sys
 
@@ -16,44 +16,48 @@ on Rinkeby
 5) network.gas_price("1 gwei")
 6) run('deploy-all')
 
-GTC Token deploy will mint tokens to first param, since distributor has not been deployed yet, we send to multsig
+GTA Token deploy will mint tokens to first param, since distributor has not been deployed yet, we send to multsig
 multiSig then needs to send to dist contract before claims will process (so tokendist has coins to send!)
 '''
 
-# set multisig address to be that of our first account. For production you will want to change this to the correct multisig addy 
-owocki_address = accounts[0]
-multiSig = accounts[0]
+publish_source_ES = False; # True if you want to auto verify contract source on Etherscan
+owocki_address = accounts[0] # all tokens will be minted to this address initially before being transferred accordingly 
+multiSig = accounts[0] # 
 timeNow = time.time()
 signing_address_1 = '0x58E159e41bA3987755fF762836CC7338C0bC01ef'
-timelock_delay = 172800 # 2 days in seconds
 merkleRoot = '0x7dc3a9718c26cf4e870fcaa7702635cb4305e15b5a8acbf2c665641c4775d8a3' # testing 50k 4/6/2021
+timelock_delay = 172800 # 2 days in seconds
+treasury_vesting_begin = timeNow + 120 # must be greater than block timestamp of contract deploy 
+treasury_vesting_cliff = (60 * 60 * 24 * 7 * 12) + timeNow # 6 months in seconds
+treasury_vesting_amount = Wei("1000 ether")
+treasury_vesting_end = timeNow + (treasury_vesting_cliff*2)
+cb_custody = accounts[4].address # coinbase custody address   
 
 def main():
     # print out some relevant info about our testing env 
     loginfo()
     '''
-     * @notice Construct a new GTC token
+     * @notice Construct a new GTA token
      * @param account The initial account to grant all the tokens
      * @param minter_ The account with minting ability
      * @param mintingAllowedAfter_ The timestamp after which minting may occur - Just adding 2 mins for Rinkeby
     '''
     try:
-        gtc = GTC.deploy(owocki_address, multiSig, int(timeNow + 120), {'from': accounts[0]})
-        print(f'GTC address {gtc.address}')
+        if publish_source_ES: 
+            gta = GTA.deploy(owocki_address, multiSig, int(timeNow + 120), {'from': accounts[0]}, publish_source=True)
+        else: 
+            gta = GTA.deploy(owocki_address, multiSig, int(timeNow + 120), {'from': accounts[0]})
+        print(f'GTA address {gta.address}')
     except Exception as e:
-        print(f'Error on GTC contract deploy {e}')
-        sys.exit(1)
-    
-    # deploy TokenVesting.sol takes two params: _token & multiSig 
-    try:
-        tv = TokenVesting.deploy(gtc.address, multiSig, {'from': accounts[0]})
-    except Exception as e:
-        print(f'Error on TokenVesting contract deployment: {e}')
+        print(f'Error on GTA contract deploy {e}')
         sys.exit(1)
     
     # deploy the timelock contract 
     try:
-        tl = Timelock.deploy(multiSig, timelock_delay, {'from': accounts[0]})
+        if publish_source_ES:
+            tl = Timelock.deploy(multiSig, timelock_delay, {'from': accounts[0]}, publish_source=True)
+        else:
+            tl = Timelock.deploy(multiSig, timelock_delay, {'from': accounts[0]})
     except Exception as e:
         print(f'Error on Timelock deploy: {e}')
         sys.exit(1)
@@ -61,28 +65,50 @@ def main():
     # deploy TokenDistributor.sol takes 4 params, token address, signer address, timelock address, merkleRoot
     # signer address == corresponding public key (address/account) to the private key used 
     # to sign claims with Ethereum Signed Message Service  
-    try: 
-        td = TokenDistributor.deploy(gtc.address, signing_address_1, tl.address, merkleRoot, {'from': accounts[0]})
+    try:
+        if publish_source_ES: 
+            td = TokenDistributor.deploy(gta.address, signing_address_1, tl.address, merkleRoot, {'from': accounts[0]}, publish_source=True)
+        else:
+            td = TokenDistributor.deploy(gta.address, signing_address_1, tl.address, merkleRoot, {'from': accounts[0]})
     except Exception as e:
         print(f'Error on TokenDistributor contract deploy: {e}')
         sys.exit(1)
         
     # deploy the GovernorAlpha 
     try:
-        gov = GovernorAlpha.deploy(tl.address, gtc.address, {'from' : accounts[0]})
+        if publish_source_ES:
+            gov = GovernorAlpha.deploy(tl.address, gta.address, {'from' : accounts[0]}, publish_source=True)
+        else:
+            gov = GovernorAlpha.deploy(tl.address, gta.address, {'from' : accounts[0]})
     except Exception as e:
-        print(f'Error on GovernorAlpha deploy')
+        print(f'Error on GovernorAlpha deploy: {e}')
         sys.exit(1)
+    
+    # deploy TresuryVesting.sol
+    # <ContractConstructor 'TreasuryVester.constructor(address gta_, address recipient_, uint256 vestingAmount_, uint256 vestingBegin_, uint256 vestingCliff_, uint256 vestingEnd_)'> 
+    try: 
+        if publish_source_ES:
+            tv = TreasuryVester.deploy(gta.address, tl.address, treasury_vesting_amount, treasury_vesting_begin, treasury_vesting_cliff, treasury_vesting_end, {'from' : accounts[0]}, publish_source=True)
+        else: 
+            tv = TreasuryVester.deploy(gta.address, tl.address, treasury_vesting_amount, treasury_vesting_begin, treasury_vesting_cliff, treasury_vesting_end, {'from' : accounts[0]})
+    except Exception as e:
+        print(f'Error on TreasuryVesting deploy: {e}')
+        sys.exit(1)
+
 
     # allow token dist contract to set delegate addresses 
     try: 
-        set_GTCToken_address(td, gtc)
+        set_GTCToken_address(td, gta)
     except Exception as e:
         print(f'error running set_GTCToken_Address {e}')
         sys.exit(1) 
     
-    # send minted coins to tokenDIst
-    gtc.transfer(td.address,"3000000 ether", {'from': owocki_address})
+    ## DISTRIBUTE INITIAL TOKENS ## 
+    # 1/2 to TokenDistributor 
+    gta.transfer(td.address,"1500000 ether", {'from': owocki_address})
+    # transfer to CB custody 
+    gta.transfer(cb_custody, "1000000 ether", {'from': owocki_address})
+
     
 
 def loginfo():
@@ -99,10 +125,10 @@ def token_distributor():
     '''Base token dist testing functionality using EIP712''' 
     
     # get our contract 
-    td, gtc = TokenDistributor[0], GTC[0]
+    td, gta = TokenDistributor[0], GTA[0]
 
     # then, mint some tokens to the dist contract 
-    gtc.mint(td.address, Wei("1000 ether"), {'from' : accounts[0]})
+    gta.mint(td.address, Wei("1000 ether"), {'from' : accounts[0]})
 
     # make a claim (with checksummed addy)
     td.claimTokens(
@@ -114,11 +140,11 @@ def token_distributor():
         {'from': accounts[0]}
     )
 
-def set_GTCToken_address(td, gtc):
+def set_GTCToken_address(td, gta):
     '''Used call this to set the GTCToken Address on the TokenDistributor contract. 
        This is needed because we have to deploy the GTCToken contract before the token distributor
     '''
-    # td, gtc = TokenDistributor[0], GTC[0]
-    gtc.setGTCDist(td.address, {'from': accounts[0]})
-    print(f'GTC contract now as the the address: {gtc.GTCDist()} set in for the TokenDistributor Contract')
+    # td, gta = TokenDistributor[0], GTA[0]
+    gta.setGTCDist(td.address, {'from': accounts[0]})
+    print(f'GTA contract now as the the address: {gta.GTCDist()} set in for the TokenDistributor Contract')
 

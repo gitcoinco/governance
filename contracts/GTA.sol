@@ -3,7 +3,7 @@ pragma experimental ABIEncoderV2;
 
 import "./SafeMath.sol";
 
-contract GTC {
+contract GTA {
     /// @notice EIP-20 token name for this token
     string public constant name = "GT Alpha";
 
