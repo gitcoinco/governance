@@ -78,12 +78,12 @@ contract TokenDistributor{
         merkleRoot = _merkleRoot;
         timeLockContract = _timeLock;
         deployTime = block.timestamp; 
-                
+        // !!! verifiyingContract should be: address(this) for production not hard coded address.          
         DOMAIN_SEPARATOR = hash(EIP712Domain({
             name: "GTA",
             version: '1.0.0',
             chainId: 4,
-            verifyingContract: address(this)
+            verifyingContract: 0xBD2525B5F0B2a663439a78A99A06605549D25cE5
         }));
 
     }

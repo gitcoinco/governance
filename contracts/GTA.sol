@@ -260,7 +260,7 @@ contract GTA {
      * @notice Delegate votes from `msg.sender` to `delegatee`
      * @param delegatee The address to delegate votes to
      */
-    function delegate(address delegatee) public {
+    function delegate(address delegatee) external {
         return _delegate(msg.sender, delegatee);
     }
 
@@ -269,7 +269,7 @@ contract GTA {
      * @param delegator The address to delegate votes from 
      * @param delegatee The address to delegate votes to
      */
-    function delegateOnDist(address delegator, address delegatee) public onlyBy(GTCDist) {
+    function delegateOnDist(address delegator, address delegatee) external onlyBy(GTCDist) {
         return _delegate(delegator, delegatee);
     }
 
@@ -282,7 +282,7 @@ contract GTA {
      * @param r Half of the ECDSA signature pair
      * @param s Half of the ECDSA signature pair
      */
-    function delegateBySig(address delegatee, uint nonce, uint expiry, uint8 v, bytes32 r, bytes32 s) public {
+    function delegateBySig(address delegatee, uint nonce, uint expiry, uint8 v, bytes32 r, bytes32 s) external {
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(DELEGATION_TYPEHASH, delegatee, nonce, expiry));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
@@ -310,7 +310,7 @@ contract GTA {
      * @param blockNumber The block number to get the vote balance at
      * @return The number of votes the account had as of the given block
      */
-    function getPriorVotes(address account, uint blockNumber) public view returns (uint96) {
+    function getPriorVotes(address account, uint blockNumber) external view returns (uint96) {
         require(blockNumber < block.number, "GTA::getPriorVotes: not yet determined");
 
         uint32 nCheckpoints = numCheckpoints[account];

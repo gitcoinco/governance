@@ -10,7 +10,6 @@ The GTC token distribution event will be front lined by the Quadratic Lands expe
 
 Here you can find a guide on [how to deploy the Gitcoin governance contracts with Brownie](docs/DEPLOYMENT-GUIDE.md). Other guides can be found directly [in the /docs](/docs/README.md) directory. 
 
-
 # Primary Contracts 
 
 1) GTC.sol - ERC20 contract for the GTC Token forked from [Uni.sol](https://github.com/Uniswap/governance/blob/master/contracts/Uni.sol)
@@ -50,6 +49,7 @@ You can explore live Rinkeby blockchain data for the Timelock contract on the [G
 You can explore live Rinkeby blockchain data for the GovernorAlpha contract on the [Gitcoin Token Subgraphs](https://thegraph.com/explorer/subgraph/nopslip/wolf-vision?query=ZAC_TODO).
 
 ---
+
 
 
 

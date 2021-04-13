@@ -105,9 +105,9 @@ def main():
     
     ## DISTRIBUTE INITIAL TOKENS ## 
     # 1/2 to TokenDistributor 
-    gta.transfer(td.address,"1500000 ether", {'from': owocki_address})
+    gta.transfer(td.address,Wei("1500000 ether"), {'from': owocki_address})
     # transfer to CB custody 
-    gta.transfer(cb_custody, "1000000 ether", {'from': owocki_address})
+    gta.transfer(cb_custody,Wei("1000000 ether"), {'from': owocki_address})
 
     
 
