@@ -12,8 +12,8 @@ import random
 v1_api_uri = 'https://esms-audit.grasshopper.surf/v1/sign_claim'
 dev_hmac_key = 'E49756B4C8FAB4E48222A3E7F3B97CC3' 
 signing_address = '0x58E159e41bA3987755fF762836CC7338C0bC01ef' # dev/testing
-# merkleRoot = '0x7dc3a9718c26cf4e870fcaa7702635cb4305e15b5a8acbf2c665641c4775d8a3' # testing 50k 4/6/2021
-merkleRoot = '0x7fbcd210e229bbea2fd3e2e70fec625b962180383f387c8427b7ec8aa3aad431' # initial dist sample from KO v1 4/13/2021
+# merkleRoot = '0x7fbcd210e229bbea2fd3e2e70fec625b962180383f387c8427b7ec8aa3aad431' # initial dist sample from KO v1 4/13/2021
+merkleRoot = '0xae2d57be918fb3faf024c55c14461753fd241ed523b61e0ac60aa5408c39066a' # new version of merkle tree with KO v1 initial dist 4/14/21
 timelock_delay = 172800 # 2 days in seconds
 test_dist_file = './tests/initial_dist.csv' # initial dist sample from KO v1 4/13/2021
 
@@ -75,16 +75,16 @@ def test_dist_address_on_token(token, td):
     token.setGTCDist(td.address, {'from': accounts[0]})
     assert token.GTCDist() != '0x0000000000000000000000000000000000000000', "Token doesn't have the TokenDistribution contract address set appropriately for delegation on dist."
 
-def test_token_claim(token,td,seed,set_dist_address): 
+def test_valid_claim(token,td,seed,set_dist_address): 
     '''
        Submit claim to ESMS use respone to make on-chain claim.
        Test that a valid claim will transfer tokens to user  
     '''
-  
+    # valid claim from 4/13 merkle root 
     claim_address = accounts[0].address
     delegate_address = accounts[1].address
-    user_id = 1
-    total_claim = Wei("1 ether")
+    user_id = 3221 
+    total_claim = 8007641666299999993856
     
     token_claim = TokenClaim(user_id, claim_address, delegate_address, total_claim) 
     
@@ -108,21 +108,15 @@ def test_token_claim(token,td,seed,set_dist_address):
 def test_full_dist_list(token, td, seed, set_dist_address):
     """Iterate though and test every claim on the list"""
   
-    # generate Brownie accounts for each user in the file 
-    # number_of_users = len(open(test_dist_file).readlines())
-    # for user in range(0,number_of_users):
-        # accounts.add()
-
     with open(test_dist_file, 'r') as csvfile:
-        datareader = csv.reader(csvfile)
-        next(datareader) # skip header 
+        initial_distribution = csv.reader(csvfile)
+        next(initial_distribution) # skip header 
         
-        for row in datareader:
-            random_address_index = random.randint(0, 9)
-            user_id = int(row[1]) # user_id
-            # print(f'user_id: {user_id}')
+        for row in initial_distribution:
+            random_index = random.randint(0, 9) # pick a random number for address index 
+            user_id = int(row[1]) # user_id 
             total_claim = int(row[2]) # total_claim
-            claim_address = accounts[random_address_index].address # set user claim address
+            claim_address = accounts[random_index].address # set random address 
             delegate_address = claim_address # self delegate 
                    
             # get balance before  
@@ -132,7 +126,10 @@ def test_full_dist_list(token, td, seed, set_dist_address):
             token_claim = TokenClaim(user_id, claim_address, delegate_address, total_claim)
             
             # make claim
-            claim_tx = td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : claim_address})
+            try: 
+                claim_tx = td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : claim_address})
+            except Exception as e:
+                print(f'TokenDistribution test: There was an issue sending claim to the contract: {e}') 
             
             # get use balance before claim 
             balance_after = token.balanceOf(claim_address)
@@ -145,7 +142,7 @@ def test_full_dist_list(token, td, seed, set_dist_address):
     # uncomment to debug and print details to stdout 
     # assert False, "You intentionally triggered execpetion to print debug info to stdout"
 
-# easy to use token claim object 
+# for crafting token claim objects  
 class TokenClaim:
 
   def __init__(self, _user_id, _user_address, _delegate_address, _total_claim):
@@ -191,22 +188,25 @@ def generate_claim(user_id, user_address, delegate_address, total_claim):
         emss_response_content = emss_response.content
         emss_response.raise_for_status() # raise exception on error 
     except requests.exceptions.ConnectionError:
-        print('TD TEST: ConnectionError while connecting to EMSS!')
+        print('TokenDistribtor: ConnectionError while connecting to ESMS')
      
     except requests.exceptions.Timeout:
         # Maybe set up for a retry
-        print('TD TEST: Timeout while connecting to EMSS!')
+        print('TokenDistribtor: Timeout while connecting to ESMS')
  
     except requests.exceptions.TooManyRedirects:
-        print('TD TEST: Too many redirects while connecting to EMSS!')
+        print('TokenDistribtor: Too many redirects while connecting to ESMS')
      
     except requests.exceptions.RequestException as e:
         # catastrophic error. bail.
-        print(f'TD TEST:  Error posting to EMSS - {e}')
-
-    # pass returned values from eth signer microservice
-    # ESMS returns bytes object of json. so, we decode it
-    full_response = json.loads( emss_response_content.decode('utf-8'))
+        print(f'TokenDistribtor test Error posting to ESMS - {e}')
+    
+    try:
+        # ESMS returns may retrun objects. so, we decode 
+        full_response = json.loads(emss_response_content.decode('utf-8'))
+    except Exception as e:
+        full_response = []
+        print(f'TokenDistribution test Error - {e}')
 
     # print(f'GTC Token Distributor - ESMS response: {full_response}')
     return full_response 
@@ -219,7 +219,7 @@ def create_sha256_signature(key, message):
         message = message.encode()
         return hmac.new(byte_key, message, hashlib.sha256).hexdigest().upper()
     except Exception as e:
-        logger.error(f'GTC Distributor - Error Hashing Message: {e}')
+        logger.error(f'TokenDistribtor - Error Hashing Message: {e}')
         return False 
 
 

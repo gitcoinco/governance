@@ -25,7 +25,7 @@ owocki_address = accounts[0] # all tokens will be minted to this address initial
 multiSig = accounts[0] # 
 timeNow = time.time()
 signing_address_1 = '0x58E159e41bA3987755fF762836CC7338C0bC01ef'
-merkleRoot = '0x7dc3a9718c26cf4e870fcaa7702635cb4305e15b5a8acbf2c665641c4775d8a3' # testing 50k 4/6/2021
+merkleRoot = '0xae2d57be918fb3faf024c55c14461753fd241ed523b61e0ac60aa5408c39066a' # new version of merkle tree with KO v1 initial dist 4/14/21
 timelock_delay = 172800 # 2 days in seconds
 treasury_vesting_begin = timeNow + 120 # must be greater than block timestamp of contract deploy 
 treasury_vesting_cliff = (60 * 60 * 24 * 7 * 12) + timeNow # 6 months in seconds
@@ -147,4 +147,3 @@ def set_GTCToken_address(td, gta):
     # td, gta = TokenDistributor[0], GTA[0]
     gta.setGTCDist(td.address, {'from': accounts[0]})
     print(f'GTA contract now as the the address: {gta.GTCDist()} set in for the TokenDistributor Contract')
-
