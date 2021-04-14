@@ -1,5 +1,6 @@
 import pytest
 from brownie import GTA, TokenDistributor, Timelock, accounts, web3, Wei, reverts
+import brownie
 import time
 import requests
 import json
@@ -13,7 +14,7 @@ v1_api_uri = 'https://esms-audit.grasshopper.surf/v1/sign_claim'
 dev_hmac_key = 'E49756B4C8FAB4E48222A3E7F3B97CC3' 
 signing_address = '0x58E159e41bA3987755fF762836CC7338C0bC01ef' # dev/testing
 # merkleRoot = '0x7fbcd210e229bbea2fd3e2e70fec625b962180383f387c8427b7ec8aa3aad431' # initial dist sample from KO v1 4/13/2021
-merkleRoot = '0xae2d57be918fb3faf024c55c14461753fd241ed523b61e0ac60aa5408c39066a' # new version of merkle tree with KO v1 initial dist 4/14/21
+merkleRoot = '0x3b34f9b61897f9f6231c8e161fb4b17394e807076f2ce245e2adc266d11bbdb1' # newer version of merkle tree with KO v1 initial dist 4/14/21
 timelock_delay = 172800 # 2 days in seconds
 test_dist_file = './tests/initial_dist.csv' # initial dist sample from KO v1 4/13/2021
 
@@ -33,7 +34,7 @@ def token():
 @pytest.fixture(scope="module")
 def tl():
     """
-        TimeLock Contract - Only needed here in the TD test as all GTC not claimed 
+        TimeLock Contract - Only needed here in the TD test as all GTA not claimed 
         can be swept to TimeLock after 6 months
     """
     multiSig = accounts[0] 
@@ -55,7 +56,7 @@ def td(token, tl):
 @pytest.fixture(scope="module")
 def set_dist_address(token, td):
     """Token needs to know the tokenDist contract address for approved setting of delegate with different source address"""
-    return token.setGTCDist(td.address, {'from': accounts[0]}) 
+    return token.setGTADist(td.address, {'from': accounts[0]}) 
 
 @pytest.fixture(scope="module")
 def seed(token, td):
@@ -72,8 +73,8 @@ def test_valid_contract_address(token, td):
     assert web3.isChecksumAddress(token.address) and web3.isChecksumAddress(token.address), "One or more contract addresses could not be validated. Please confirm contracts we're deployed as expected."
  
 def test_dist_address_on_token(token, td):
-    token.setGTCDist(td.address, {'from': accounts[0]})
-    assert token.GTCDist() != '0x0000000000000000000000000000000000000000', "Token doesn't have the TokenDistribution contract address set appropriately for delegation on dist."
+    token.setGTADist(td.address, {'from': accounts[0]})
+    assert token.GTADist() != '0x0000000000000000000000000000000000000000', "Token doesn't have the TokenDistribution contract address set appropriately for delegation on dist."
 
 def test_valid_claim(token,td,seed,set_dist_address): 
     '''
@@ -92,7 +93,7 @@ def test_valid_claim(token,td,seed,set_dist_address):
     balance_before = token.balanceOf(claim_address)
 
     # place token claim 
-    td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf)
+    td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : claim_address})
 
     # get use balance before claim 
     balance_after = token.balanceOf(claim_address)
@@ -104,8 +105,62 @@ def test_valid_claim(token,td,seed,set_dist_address):
     # uncomment to debug and print details to stdout 
     # assert False, "You intentionally triggered execpetion to print debug info to stdout"
 
+def test_claim_from_different_source(token,td,set_dist_address):
+    '''
+    The token distribution contract is designed to only allow a claim to proceed if the 
+    msg.sender address matches the user_account address provided in the signed message object.
+    ''' 
+    valid_claim = ValidClaim() # get known valid claim base metadata 
+    token_claim = TokenClaim(valid_claim.user_id, valid_claim.claim_address, valid_claim.delegate_address, valid_claim.total_claim) # get signed token claim from the EMSM
+    
+    # should revert as we're sending claim from different msg.sender 
+    with brownie.reverts("TokenDistributor: Must be msg sender."):
+        td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : accounts[2].address})
 
-def test_full_dist_list(token, td, seed, set_dist_address):
+def test_only_claim_once(token,td,set_dist_address):
+    '''
+    Token distribution contract is designed to only allow a given user (as per the initial_dist.csv)
+    claim tokens exactly one time. Should revert if user attempts to claim twice
+    '''
+    valid_claim = ValidClaim() # get known valid claim base metadata 
+    token_claim = TokenClaim(valid_claim.user_id, valid_claim.claim_address, valid_claim.delegate_address, valid_claim.total_claim) # get signed token claim from the EMSM
+    
+    # should be successful claim 
+    td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : token_claim.user_address}
+    )
+
+    # should revert as we're trying to claim again for the same user  
+    with brownie.reverts("TokenDistributor: Tokens already claimed."):
+        td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : token_claim.user_address})
+  
+def test_claim_fails_with_bad_metadata(token,td,set_dist_address):
+    '''
+    In addition to checking if a claim is signed by the expected acccount
+    we also confirm that key metadata provided with the claim can 
+    be re-hashed to create the original message that was signed. 
+    This helps ensure integrity of the claim. 
+    '''
+    valid_claim = ValidClaim() # get known valid claim base metadata 
+    token_claim = TokenClaim(valid_claim.user_id, valid_claim.claim_address, valid_claim.delegate_address, valid_claim.total_claim) # get signed token claim from the EMSM
+    
+    # should revert as we send a different claim amount than that of which was provided with the original message 
+    with brownie.reverts("TokenDistributor: Hash Mismatch."):
+        td.claimTokens(token_claim.user_id, token_claim.user_address, 1223943873000000061440, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : token_claim.user_address})
+
+def test_invalid_leaf(token,td,set_dist_address): 
+    '''
+       This test case emulates a scenario where the signed message service is tricked into signing a claim 
+       that doesn't exist on the master initial distribution list.
+    '''
+
+    valid_claim = FraudlentClaim() # get known valid claim base metadata 
+    token_claim = TokenClaim(valid_claim.user_id, valid_claim.claim_address, valid_claim.delegate_address, valid_claim.total_claim) # get signed token claim from the EMSM
+    
+    # should revert as we send a leaf that doesn't exist on the tree 
+    with brownie.reverts("TokenDistributor: Leaf Hash Mismatch."):
+        td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : token_claim.user_address})
+
+def dont_test_full_dist_list(token, td, seed, set_dist_address):
     """Iterate though and test every claim on the list"""
   
     with open(test_dist_file, 'r') as csvfile:
@@ -130,35 +185,47 @@ def test_full_dist_list(token, td, seed, set_dist_address):
                 claim_tx = td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : claim_address})
             except Exception as e:
                 print(f'TokenDistribution test: There was an issue sending claim to the contract: {e}') 
-            
+        
             # get use balance before claim 
             balance_after = token.balanceOf(claim_address)
-
-            # print(f'balance_before: {balance_before}')
-            # print(f'balance_after: {balance_after}')
-            # print(f'gas_used: {claim_tx.gas_used}')
+     
             assert balance_before < balance_after, "Token claim failed"
              
     # uncomment to debug and print details to stdout 
     # assert False, "You intentionally triggered execpetion to print debug info to stdout"
 
-# for crafting token claim objects  
-class TokenClaim:
+# reusable, valid, base token claim metadata from 4/13 KO V1 initial dist  
+class ValidClaim:
+    def __init__(self):
+        self.user_id = 3221
+        self.claim_address = accounts[1].address 
+        self.delegate_address = accounts[1].address
+        self.total_claim = 8007641666299999993856
 
-  def __init__(self, _user_id, _user_address, _delegate_address, _total_claim):
-      ''' push claim objects emitted from Ethereum Message
-          Signing Service into an on-chain claimable object 
-      '''
-      raw_claim = generate_claim(_user_id, _user_address, _delegate_address, _total_claim)
-     
-      self.user_id = _user_id
-      self.user_address = _user_address 
-      self.user_amount = _total_claim
-      self.delegate_address = _delegate_address
-      self.hash = raw_claim["eth_signed_message_hash_hex"]
-      self.sig = raw_claim["eth_signed_signature_hex"]
-      self.leaf = raw_claim["leaf"]
-      self.proof = raw_claim["proof"]
+# reusable, mismatched, base token claim metadata based on 4/13 KO v1 initial dist  
+class FraudlentClaim:
+    def __init__(self):
+        self.user_id = 3221
+        self.claim_address = accounts[1].address 
+        self.delegate_address = accounts[1].address
+        self.total_claim = 9666666666666666666666
+
+# for crafting full signed, token claim objects  
+class TokenClaim:
+    def __init__(self, _user_id, _user_address, _delegate_address, _total_claim):
+        ''' push claim objects emitted from Ethereum Message
+            Signing Service into an on-chain claimable object 
+        '''
+        raw_claim = generate_claim(_user_id, _user_address, _delegate_address, _total_claim)
+        
+        self.user_id = _user_id
+        self.user_address = _user_address 
+        self.user_amount = _total_claim
+        self.delegate_address = _delegate_address
+        self.hash = raw_claim["eth_signed_message_hash_hex"]
+        self.sig = raw_claim["eth_signed_signature_hex"]
+        self.leaf = raw_claim["leaf"]
+        self.proof = raw_claim["proof"]
 
 
 def generate_claim(user_id, user_address, delegate_address, total_claim):
@@ -208,7 +275,7 @@ def generate_claim(user_id, user_address, delegate_address, total_claim):
         full_response = []
         print(f'TokenDistribution test Error - {e}')
 
-    # print(f'GTC Token Distributor - ESMS response: {full_response}')
+    # print(f'GTA Token Distributor - ESMS response: {full_response}')
     return full_response 
     
 

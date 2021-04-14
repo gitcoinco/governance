@@ -1,4 +1,4 @@
-pragma solidity ^0.5.16;
+pragma solidity 0.5.17;
 pragma experimental ABIEncoderV2;
 
 import "./SafeMath.sol";
@@ -19,8 +19,8 @@ contract GTA {
     /// @notice Address which may mint new tokens
     address public minter;
 
-    /// @notice Address of the GTCDistribution contract 
-    address public GTCDist;
+    /// @notice Address of the GTADistribution contract 
+    address public GTADist;
 
     /// @notice The timestamp after which minting may occur
     /// @dev Do we need this? should we delete if not? 
@@ -72,7 +72,7 @@ contract GTA {
     event MinterChanged(address minter, address newMinter);
 
     /// @notice An event thats emitted when the minter address is changed
-    event GTCDistChanged(address delegator, address delegatee);
+    event GTADistChanged(address delegator, address delegatee);
 
     /// @notice An event thats emitted when an account changes its delegate
     event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
@@ -93,9 +93,7 @@ contract GTA {
      * @param mintingAllowedAfter_ The timestamp after which minting may occur
      */
     constructor(address account, address minter_, uint mintingAllowedAfter_) public {
-        // confirm we want/need this 
-        //require(mintingAllowedAfter_ >= block.timestamp, "GTA::constructor: minting can only begin after deployment");
-
+        require(mintingAllowedAfter_ >= block.timestamp, "GTA::constructor: minting can only begin after deployment");
         balances[account] = uint96(totalSupply);
         emit Transfer(address(0), account, totalSupply);
         minter = minter_;
@@ -114,13 +112,13 @@ contract GTA {
     }
 
     /**
-     * @notice Change/set TokenDistribution address, needs to be called after GTCToken contract is deployed 
-     * @param GTCDist_ The address of the TokenDistributor contract
+     * @notice Change/set TokenDistribution address, needs to be called after GTAToken contract is deployed 
+     * @param GTADist_ The address of the TokenDistributor contract
      */
-    function setGTCDist(address GTCDist_) external {
-        require(msg.sender == minter, "GTA::setGTCDist: only the minter can change the GTCDist address");
-        emit GTCDistChanged(GTCDist, GTCDist_);
-        GTCDist = GTCDist_;
+    function setGTADist(address GTADist_) external {
+        require(msg.sender == minter, "GTA::setGTADist: only the minter can change the GTADist address");
+        emit GTADistChanged(GTADist, GTADist_);
+        GTADist = GTADist_;
     }
 
     /**
@@ -269,7 +267,7 @@ contract GTA {
      * @param delegator The address to delegate votes from 
      * @param delegatee The address to delegate votes to
      */
-    function delegateOnDist(address delegator, address delegatee) external onlyBy(GTCDist) {
+    function delegateOnDist(address delegator, address delegatee) external onlyBy(GTADist) {
         return _delegate(delegator, delegatee);
     }
 

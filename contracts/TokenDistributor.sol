@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-pragma solidity ^0.6.0;
+pragma solidity 0.6.12;
 
 import "OpenZeppelin/openzeppelin-contracts@3.2.0/contracts/token/ERC20/IERC20.sol";
 import "OpenZeppelin/openzeppelin-contracts@3.2.0/contracts/cryptography/ECDSA.sol";
@@ -111,19 +111,22 @@ contract TokenDistributor{
 
         ) external {
 
-        // **TESTING** only accept signed messages from sender  
-        require(msg.sender == user_address, 'TokenDistributor: Must be msg sender');
+        // only accept claim if msg.sender address is in signed claim   
+        require(msg.sender == user_address, 'TokenDistributor: Must be msg sender.');
 
-        // **ENABLE ME FOR PRODUCTION!** one claim per user  
-        //require(!isClaimed(user_id), 'TokenDistributor: Tokens already claimed.');
+        // one claim per user  
+        require(!isClaimed(user_id), 'TokenDistributor: Tokens already claimed.');
         
         // has the user provided a valid [org] signed message? 
         require(isSigned(eth_signed_message_hash_hex, eth_signed_signature_hex), 'TokenDistributor: Valid Digital Signature Required.');
         
         // can we recreate the same hash from the raw message contents? 
-        require(hashMatch(user_id, user_address, user_amount, delegate_address, leaf, eth_signed_message_hash_hex), 'TokenDistributor: Hash Mismatch');
+        require(hashMatch(user_id, user_address, user_amount, delegate_address, leaf, eth_signed_message_hash_hex), 'TokenDistributor: Hash Mismatch.');
         
-        // can we repoduce a hash from our merkle tree? 
+        // can we repoduce leaf hash included in the claim?
+        require(_hashLeaf(user_id, user_amount, leaf), 'TokenDistributor: Leaf Hash Mismatch.');
+
+        // does the leaf exist on our tree? 
         require(MerkleProof.verify(merkleProof, merkleRoot, leaf), 'TokenDistributor: Valid Proof Required.');
         
         // process token claim!! 
@@ -134,6 +137,11 @@ contract TokenDistributor{
         emit Claimed(user_id, user_address, user_amount, leaf);
     }
     
+    function _hashLeaf(uint32 user_id, uint256 user_amount, bytes32 leaf) private returns (bool) {
+        bytes32 leaf_hash = keccak256(abi.encodePacked(keccak256(abi.encodePacked(user_id, user_amount))));
+        return leaf == leaf_hash;
+    } 
+
     /**
     * @notice execute call on token contract to delegate tokens   
     * @return boolean true on success 
