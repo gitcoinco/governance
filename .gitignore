@@ -5,3 +5,4 @@ build/
 reports/
 brownie-config.yaml
 .DS_Store
+.tests-env

@@ -9,14 +9,11 @@ import hashlib
 import binascii
 import csv
 import random
+import os
+from dotenv import dotenv_values
 
-v1_api_uri = 'https://esms-audit.grasshopper.surf/v1/sign_claim'
-dev_hmac_key = 'E49756B4C8FAB4E48222A3E7F3B97CC3' 
-signing_address = '0x58E159e41bA3987755fF762836CC7338C0bC01ef' # dev/testing
-# merkleRoot = '0x7fbcd210e229bbea2fd3e2e70fec625b962180383f387c8427b7ec8aa3aad431' # initial dist sample from KO v1 4/13/2021
-merkleRoot = '0x3b34f9b61897f9f6231c8e161fb4b17394e807076f2ce245e2adc266d11bbdb1' # newer version of merkle tree with KO v1 initial dist 4/14/21
-timelock_delay = 172800 # 2 days in seconds
-test_dist_file = './tests/initial_dist.csv' # initial dist sample from KO v1 4/13/2021
+#load up envars from .env
+env = dotenv_values(".tests-env")
 
 @pytest.fixture(scope="module")
 def token():
@@ -37,8 +34,8 @@ def tl():
         TimeLock Contract - Only needed here in the TD test as all GTA not claimed 
         can be swept to TimeLock after 6 months
     """
-    multiSig = accounts[0] 
-    return Timelock.deploy(multiSig, timelock_delay, {'from': accounts[0]})
+    multiSig = accounts[0]
+    return Timelock.deploy(multiSig, env['TIMELOCK_DELAY'], {'from': accounts[0]})
 
 @pytest.fixture(scope="module")
 def td(token, tl):
@@ -51,7 +48,7 @@ def td(token, tl):
         _merkleRoot - Merkle Root of the distribution tree 
     """
     _token = token.address
-    return TokenDistributor.deploy(_token, signing_address, tl.address, merkleRoot, {'from': accounts[0]})
+    return TokenDistributor.deploy(_token, env['SIGNING_ADDRESS'], tl.address, env['MERKLE_ROOT'], {'from': accounts[0]})
 
 @pytest.fixture(scope="module")
 def set_dist_address(token, td):
@@ -160,10 +157,10 @@ def test_invalid_leaf(token,td,set_dist_address):
     with brownie.reverts("TokenDistributor: Leaf Hash Mismatch."):
         td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : token_claim.user_address})
 
-def dont_test_full_dist_list(token, td, seed, set_dist_address):
+def test_full_dist_list(token, td, seed, set_dist_address):
     """Iterate though and test every claim on the list"""
   
-    with open(test_dist_file, 'r') as csvfile:
+    with open(env['DIST_FILE'], 'r') as csvfile:
         initial_distribution = csv.reader(csvfile)
         next(initial_distribution) # skip header 
         
@@ -230,7 +227,7 @@ class TokenClaim:
 
 def generate_claim(user_id, user_address, delegate_address, total_claim):
     '''Mimic Quadratic Lands application by sending a claim request to the Ethereum Signed Message Service'''
-
+    
     post_data_to_emss = {}
     post_data_to_emss['user_id'] = user_id
     post_data_to_emss['user_address'] = user_address
@@ -240,7 +237,7 @@ def generate_claim(user_id, user_address, delegate_address, total_claim):
     # print(f'POST DATA FOR ESMS: {json.dumps(post_data_to_emss)}')
     # create a hash of post data
     try:                 
-        hmac_signed_claim = create_sha256_signature(dev_hmac_key, json.dumps(post_data_to_emss))
+        hmac_signed_claim = create_sha256_signature(env['DEV_HMAC_KEY'], json.dumps(post_data_to_emss))
     except: 
         print('Error creating hash of POST data for ESMS')
 
@@ -251,7 +248,7 @@ def generate_claim(user_id, user_address, delegate_address, total_claim):
 
     # POST relevant user data to micro service that returns signed transation data for the user broadcast
     try: 
-        emss_response = requests.post(v1_api_uri, data=json.dumps(post_data_to_emss), headers=header)
+        emss_response = requests.post(env['V1_API_URL'], data=json.dumps(post_data_to_emss), headers=header)
         emss_response_content = emss_response.content
         emss_response.raise_for_status() # raise exception on error 
     except requests.exceptions.ConnectionError:
@@ -288,5 +285,4 @@ def create_sha256_signature(key, message):
     except Exception as e:
         logger.error(f'TokenDistribtor - Error Hashing Message: {e}')
         return False 
-
 
