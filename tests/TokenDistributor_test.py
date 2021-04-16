@@ -144,20 +144,20 @@ def test_claim_fails_with_bad_metadata(token,td,set_dist_address):
     with brownie.reverts("TokenDistributor: Hash Mismatch."):
         td.claimTokens(token_claim.user_id, token_claim.user_address, 1223943873000000061440, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : token_claim.user_address})
 
-def test_invalid_leaf(token,td,set_dist_address): 
+def test_wrong_user(token,td,set_dist_address): 
     '''
        This test case emulates a scenario where the signed message service is tricked into signing a claim 
        that doesn't exist on the master initial distribution list.
     '''
 
-    valid_claim = FraudlentClaim() # get known valid claim base metadata 
+    valid_claim = BadClaim1() # get known valid claim base metadata 
     token_claim = TokenClaim(valid_claim.user_id, valid_claim.claim_address, valid_claim.delegate_address, valid_claim.total_claim) # get signed token claim from the EMSM
     
     # should revert as we send a leaf that doesn't exist on the tree 
     with brownie.reverts("TokenDistributor: Leaf Hash Mismatch."):
         td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : token_claim.user_address})
 
-def test_full_dist_list(token, td, seed, set_dist_address):
+def full_dist_list(token, td, seed, set_dist_address):
     """Iterate though and test every claim on the list"""
   
     with open(env['DIST_FILE'], 'r') as csvfile:
@@ -200,7 +200,7 @@ class ValidClaim:
         self.total_claim = 8007641666299999993856
 
 # reusable, mismatched, base token claim metadata based on 4/13 KO v1 initial dist  
-class FraudlentClaim:
+class BadClaim1:
     def __init__(self):
         self.user_id = 3221
         self.claim_address = accounts[1].address 
