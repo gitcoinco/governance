@@ -7,3 +7,4 @@ brownie-config.yaml
 .DS_Store
 .tests-env
 .deploy-all-env
+scripts/*.csv
