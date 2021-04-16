@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-
 pragma solidity 0.6.12;
 
 import "OpenZeppelin/openzeppelin-contracts@3.2.0/contracts/token/ERC20/IERC20.sol";
@@ -7,7 +6,7 @@ import "OpenZeppelin/openzeppelin-contracts@3.2.0/contracts/cryptography/ECDSA.s
 import "OpenZeppelin/openzeppelin-contracts@3.2.0/contracts/cryptography/MerkleProof.sol";
 
 /** 
- * @title - A retroactive token distribution contract 
+ * @title - A retroactive ERC20 token distribution contract 
  * @author - zk@WolfDefi
  * @notice - Provided an EIP712 compliant signed message & token claim, distributes GTA tokens 
  **/
@@ -63,8 +62,11 @@ contract TokenDistributor{
         "Claim(uint32 user_id,address user_address,uint256 user_amount,address delegate_address,bytes32 leaf)"
     );
     
-    // This event is triggered whenever a call to ClaimTokens succeeds.
+    // This event is triggered when a call to ClaimTokens succeeds.
     event Claimed(uint256 user_id, address account, uint256 amount, bytes32 leaf);
+
+    // This event is triggered when unclaimed drops are moved to Timelock after CONTRACT_ACTIVE period 
+    event TransferUnclaimed(uint256 amount);
 
     /**
      * @notice Construct a new TokenDistribution contract 
@@ -78,12 +80,12 @@ contract TokenDistributor{
         merkleRoot = _merkleRoot;
         timeLockContract = _timeLock;
         deployTime = block.timestamp; 
-        // !!! verifiyingContract should be: address(this) for production not hard coded address.          
+        
         DOMAIN_SEPARATOR = hash(EIP712Domain({
             name: "GTA",
             version: '1.0.0',
             chainId: 4,
-            verifyingContract: 0xBD2525B5F0B2a663439a78A99A06605549D25cE5
+            verifyingContract: address(this)
         }));
 
     }
@@ -117,10 +119,10 @@ contract TokenDistributor{
         // one claim per user  
         require(!isClaimed(user_id), 'TokenDistributor: Tokens already claimed.');
         
-        // has the user provided a valid [org] signed message? 
-        require(isSigned(eth_signed_message_hash_hex, eth_signed_signature_hex), 'TokenDistributor: Valid Digital Signature Required.');
+        // claim must provide a message signed by defined <signer>  
+        require(isSigned(eth_signed_message_hash_hex, eth_signed_signature_hex), 'TokenDistributor: Valid Signature Required.');
         
-        // can we recreate the same hash from the raw message contents? 
+        // can we reproduce the same hash from the raw claim metadata? 
         require(hashMatch(user_id, user_address, user_amount, delegate_address, leaf, eth_signed_message_hash_hex), 'TokenDistributor: Hash Mismatch.');
         
         // can we repoduce leaf hash included in the claim?
@@ -129,7 +131,7 @@ contract TokenDistributor{
         // does the leaf exist on our tree? 
         require(MerkleProof.verify(merkleProof, merkleRoot, leaf), 'TokenDistributor: Valid Proof Required.');
         
-        // process token claim!! 
+        // process token claim !! 
         _delegateTokens(user_address, delegate_address); 
         _setClaimed(user_id);
    
@@ -137,35 +139,58 @@ contract TokenDistributor{
         emit Claimed(user_id, user_address, user_amount, leaf);
     }
     
-    function _hashLeaf(uint32 user_id, uint256 user_amount, bytes32 leaf) private returns (bool) {
-        bytes32 leaf_hash = keccak256(abi.encodePacked(keccak256(abi.encodePacked(user_id, user_amount))));
-        return leaf == leaf_hash;
-    } 
-
     /**
-    * @notice execute call on token contract to delegate tokens   
-    * @return boolean true on success 
-    */
-    function _delegateTokens(address delegator, address delegatee) private returns (bool) {
-         GTAErc20  GTAToken = GTAErc20(token);
-         GTAToken.delegateOnDist(delegator, delegatee);
-         return true;  
-    } 
+    * @notice checks claimedBitMap to see if if user_id is 0/1
+    * @dev fork from uniswap merkle distributor, unmodified
+    * @return - boolean  
+    **/
+    function isClaimed(uint256 index) public view returns (bool) {
+        uint256 claimedWordIndex = index / 256;
+        uint256 claimedBitIndex = index % 256;
+        uint256 claimedWord = claimedBitMap[claimedWordIndex];
+        uint256 mask = (1 << claimedBitIndex);
+        return claimedWord & mask == mask;
+    }
     
     /**
-     * @notice verify that a message was signed by the holder of the private keys of a given address
-     * @return true if message was signed by signer designated on contstruction, else false 
-     **/
+    * @notice used to move any remaining tokens out of the contract after expiration   
+    **/
+    function transferUnclaimed() public {
+        require(block.timestamp >= deployTime + CONTRACT_ACTIVE, 'TokenDistributor: Contract is still active.');
+        // transfer all GTA to TimeLock
+        uint remainingBalance = IERC20(token).balanceOf(address(this));
+        require(IERC20(token).transfer(timeLockContract, remainingBalance), 'TokenDistributor: Transfer unclaimed failed.');
+        emit TransferUnclaimed(remainingBalance);
+    }
+
+    /**
+    * @notice verify that a message was signed by the holder of the private keys of a given address
+    * @return true if message was signed by signer designated on contstruction, else false 
+    **/
     function isSigned(bytes32 eth_signed_message_hash_hex, bytes memory eth_signed_signature_hex) internal view returns (bool) {
         address untrusted_signer = ECDSA.recover(eth_signed_message_hash_hex, eth_signed_signature_hex);
         return untrusted_signer == signer;
     }
 
-   /**
-   * @dev - do the user provided claim values hash up and match eth_signed_message_hash_hex?
-   * @return - boolean - true on match  
-   **/
-   function hashMatch(
+    /**
+    * @notice - Used to to generate message hash on-chain 
+    * @return - Bytes32 hash of the message that was signed 
+    **/
+    function getDigest(Claim memory claim) internal view returns (bytes32) {
+     
+        bytes32 digest = keccak256(abi.encodePacked(
+            "\x19\x01",
+            DOMAIN_SEPARATOR,
+            hashClaim(claim)
+        ));
+        return digest;
+    }
+   
+    /**
+    * @dev - does the user provided claim values hash up and match eth_signed_message_hash_hex?
+    * @return - boolean - true on match  
+    **/
+    function hashMatch(
         uint32 _user_id, 
         address _user_address, 
         uint256 _user_amount,
@@ -183,24 +208,9 @@ contract TokenDistributor{
             leaf: _leaf
         });
 
-         return getDigest(claim) == eth_signed_message_hash_hex;
-
+        return getDigest(claim) == eth_signed_message_hash_hex;
     }
 
-    /**
-    * @notice - Used to to generate message hash on-chain 
-    * @return - Bytes32 hash of the message that was signed 
-    **/
-    function getDigest(Claim memory claim) internal view returns (bytes32) {
-     
-        bytes32 digest = keccak256(abi.encodePacked(
-            "\x19\x01",
-            DOMAIN_SEPARATOR,
-            hashClaim(claim)
-        ));
-        return digest;
-    }
-   
     /**
     * @notice - this function is used to re-create pre-signed message hash on-chain 
     * @return - keccak256 hash of claim payload EIP712 style 
@@ -229,29 +239,6 @@ contract TokenDistributor{
             eip712Domain.verifyingContract
         ));
     }
-    
-    /**
-    * @notice checks claimedBitMap to see if if user_id is 0/1
-    * @dev fork from uniswap merkle distributor, unmodified
-    * @return - boolean  
-    **/
-    function isClaimed(uint256 index) public view returns (bool) {
-        uint256 claimedWordIndex = index / 256;
-        uint256 claimedBitIndex = index % 256;
-        uint256 claimedWord = claimedBitMap[claimedWordIndex];
-        uint256 mask = (1 << claimedBitIndex);
-        return claimedWord & mask == mask;
-    }
-    
-    /**
-    * @notice used to move any remaining tokens out of the contract after expiration   
-    **/
-    function transferUnclaimed() public {
-        require(block.timestamp >= deployTime + CONTRACT_ACTIVE, 'TokenDistributor: Contract is still live.');
-        // transfer all GTA to TimeLock
-        uint remainingBalance = IERC20(token).balanceOf(address(this));
-        require(IERC20(token).transfer(timeLockContract, remainingBalance), 'TokenDistributor: Transfer unclaimed failed.');
-    }
 
     /**
     * @notice Sets a given user_id to claimed 
@@ -262,6 +249,25 @@ contract TokenDistributor{
         uint256 claimedBitIndex = index % 256;
         claimedBitMap[claimedWordIndex] = claimedBitMap[claimedWordIndex] | (1 << claimedBitIndex);
     }
+
+    /**
+    * @notice hash user_id + claim amount together & compare results to leaf hash  
+    * @return boolean true on match
+    */
+    function _hashLeaf(uint32 user_id, uint256 user_amount, bytes32 leaf) private returns (bool) {
+        bytes32 leaf_hash = keccak256(abi.encodePacked(keccak256(abi.encodePacked(user_id, user_amount))));
+        return leaf == leaf_hash;
+    } 
+
+    /**
+    * @notice execute call on token contract to delegate tokens   
+    * @return boolean true on success 
+    */
+    function _delegateTokens(address delegator, address delegatee) private returns (bool) {
+         GTAErc20  GTAToken = GTAErc20(token);
+         GTAToken.delegateOnDist(delegator, delegatee);
+         return true;  
+    } 
 
 
 

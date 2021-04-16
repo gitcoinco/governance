@@ -1,5 +1,5 @@
 import pytest
-from brownie import GTA, TokenDistributor, Timelock, accounts, web3, Wei, reverts
+from brownie import GTA, TokenDistributor, Timelock, accounts, web3, Wei, reverts, chain
 import brownie
 import time
 import requests
@@ -17,12 +17,12 @@ env = dotenv_values(".tests-env")
 
 @pytest.fixture(scope="module")
 def token():
-    """ 
+    '''
         Deploy the token contract w/three params:
         multiSig - The initial account to grant all the tokens
         minter_ - The account with minting ability 
         mintingAllowedAfter_ - The timestamp after which minting may occur (unix time)
-    """ 
+    '''
     multiSig = accounts[0]
     minter = accounts[0]
     mintingAllowedAfter = int(time.time()) 
@@ -30,43 +30,43 @@ def token():
 
 @pytest.fixture(scope="module")
 def tl():
-    """
+    '''
         TimeLock Contract - Only needed here in the TD test as all GTA not claimed 
         can be swept to TimeLock after 6 months
-    """
+    '''
     multiSig = accounts[0]
     return Timelock.deploy(multiSig, env['TIMELOCK_DELAY'], {'from': accounts[0]})
 
 @pytest.fixture(scope="module")
 def td(token, tl):
-    """ 
+    '''
         TokenDistributor.sol constructor params:
         <constructor(address _token, address _signer, address _timeLock, bytes32 _merkleRoot)> 
         _token - ERC20 token that will be distributed  
         _signer - pub-key/address of the account used to sign token claims
         _timeLock - Address for the TimeLock contract
         _merkleRoot - Merkle Root of the distribution tree 
-    """
+    '''
     _token = token.address
     return TokenDistributor.deploy(_token, env['SIGNING_ADDRESS'], tl.address, env['MERKLE_ROOT'], {'from': accounts[0]})
 
 @pytest.fixture(scope="module")
 def set_dist_address(token, td):
-    """Token needs to know the tokenDist contract address for approved setting of delegate with different source address"""
+    '''Token needs to know the tokenDist contract address for approved setting of delegate with different source address'''
     return token.setGTADist(td.address, {'from': accounts[0]}) 
 
 @pytest.fixture(scope="module")
 def seed(token, td):
-    """Tansfer seed tokens to the distributor contract"""
+    '''Tansfer seed tokens to the distributor contract'''
     return token.transfer(td.address, Wei('1000000 ether'), {'from': accounts[0]})
 
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):
-    """snapshot/isolate the env after above fixtures so the tests below run against a clean snapshot"""
+    '''snapshot/isolate the env after above fixtures so the tests below run against a clean snapshot'''
     pass
 
 def test_valid_contract_address(token, td):
-    """generic test to confirm we have a working contract address"""
+    '''generic test to confirm we have a working contract address'''
     assert web3.isChecksumAddress(token.address) and web3.isChecksumAddress(token.address), "One or more contract addresses could not be validated. Please confirm contracts we're deployed as expected."
  
 def test_dist_address_on_token(token, td):
@@ -78,22 +78,18 @@ def test_valid_claim(token,td,seed,set_dist_address):
        Submit claim to ESMS use respone to make on-chain claim.
        Test that a valid claim will transfer tokens to user  
     '''
-    # valid claim from 4/13 merkle root 
-    claim_address = accounts[0].address
-    delegate_address = accounts[1].address
-    user_id = 3221 
-    total_claim = 8007641666299999993856
-    
-    token_claim = TokenClaim(user_id, claim_address, delegate_address, total_claim) 
+
+    valid_claim = ValidClaim() # get known valid claim base metadata 
+    token_claim = TokenClaim(valid_claim.user_id, valid_claim.claim_address, valid_claim.delegate_address, valid_claim.total_claim) # get signed token claim from the EMSM
     
     # get use balance before claim 
-    balance_before = token.balanceOf(claim_address)
+    balance_before = token.balanceOf(valid_claim.claim_address)
 
     # place token claim 
-    td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : claim_address})
+    td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : token_claim.user_address})
 
     # get use balance before claim 
-    balance_after = token.balanceOf(claim_address)
+    balance_after = token.balanceOf(token_claim.user_address)
 
     print(f'balance_before: {balance_before}')
     print(f'balance_after: {balance_after}')
@@ -157,8 +153,8 @@ def test_wrong_user(token,td,set_dist_address):
     with brownie.reverts("TokenDistributor: Leaf Hash Mismatch."):
         td.claimTokens(token_claim.user_id, token_claim.user_address, token_claim.user_amount, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : token_claim.user_address})
 
-def full_dist_list(token, td, seed, set_dist_address):
-    """Iterate though and test every claim on the list"""
+def _full_dist_list(token, td, seed, set_dist_address):
+    '''Iterate though and test every claim on the list'''
   
     with open(env['DIST_FILE'], 'r') as csvfile:
         initial_distribution = csv.reader(csvfile)
@@ -190,6 +186,32 @@ def full_dist_list(token, td, seed, set_dist_address):
              
     # uncomment to debug and print details to stdout 
     # assert False, "You intentionally triggered execpetion to print debug info to stdout"
+
+
+def test_sweep_unclaimed_drops_1(token, td, set_dist_address):
+    '''
+    Test that we can't move unclaimed drops to the Timelock before CONTRACT_ACTIVE period has passed 
+    OR that we can sweep funds if CONTRACT_ACTIVE has not passed. Because CONTRACT_ACTIVE is hardcoded into the contract, 
+    we have to adjust CONTRACT_ACTIVE on the contract to test both cases here: Set CONTRACT_ACTIVE 1 seconds to test sweep success
+    leave CONTRACT_ACTIVE greater than 5 seconds (default 24 weeks) to test we can't prematurely sweep. 
+    '''
+    deploy_time = td.deployTime()
+    drop_active = td.CONTRACT_ACTIVE()
+    time.sleep(5) # sleep for 10 seconds
+    current_time = chain.time()
+   
+    if (current_time >= deploy_time + drop_active): # airdrop is no longer live, anyone can sweep all funds to Timelock
+        # test_sweep_unclaimed_drops_2 should hit, so we can just pass
+        # sweep_unclaimed_drops_2(token, td, set_dist_address)
+        balance_before = token.balanceOf(td)
+        td.transferUnclaimed({'from': accounts[0]})
+        balance_after = token.balanceOf(td)
+        assert balance_before > balance_after, "Sweep Unclaimed Failed"
+        assert balance_after == 0, "sweep unclaimed failed to empty the contract"
+    else: # airdrop is still live, attempts to sweep should revert  
+        # should revert if we try to sweep unclaimed funds before CONTRACT_ACTIVE period is up
+        with brownie.reverts("TokenDistributor: Contract is still active."):
+            td.transferUnclaimed({'from': accounts[0]})
 
 # reusable, valid, base token claim metadata from 4/13 KO V1 initial dist  
 class ValidClaim:
