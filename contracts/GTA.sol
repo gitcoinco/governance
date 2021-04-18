@@ -23,16 +23,12 @@ contract GTA {
     address public GTADist;
 
     /// @notice The timestamp after which minting may occur
-    /// @dev Do we need this? should we delete if not? 
     uint public mintingAllowedAfter;
 
     /// @notice Minimum time between mints
-    /// @dev Do we need this? should we delete if not? 
-    // uint32 public constant minimumTimeBetweenMints = 1 days * 365;
-    uint32 public constant minimumTimeBetweenMints = 1 seconds;
+    uint32 public constant minimumTimeBetweenMints = 1 days * 365;
 
     /// @notice Cap on the percentage of totalSupply that can be minted at each mint
-    /// @dev Do we need this? should we delete if not? 
     uint8 public constant mintCap = 2;
 
     /// @notice Allowance amounts on behalf of others
