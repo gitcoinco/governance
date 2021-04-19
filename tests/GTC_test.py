@@ -9,12 +9,13 @@ def gtc():
     """deploy the base GTC Token contract"""
     account = accounts[0]
     minter = accounts[0]
-    mintingAllowedAfter = int(time.time()) 
+    mintingAllowedAfter = int(time.time() + 2) 
     return GTC.deploy(account, minter, mintingAllowedAfter, {'from': accounts[0]})
 
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):
     """snapshot/isolate the env after deploying contract so the tests below run against a clean snapshot"""
+    time.sleep(3)
     pass
 
 def test_deployment(gtc):
