@@ -12,9 +12,9 @@ import "OpenZeppelin/openzeppelin-contracts@3.2.0/contracts/cryptography/MerkleP
  **/
 
 /**
-* @notice interface for interacting with GTAToken delegate function
+* @notice interface for interacting with GTCToken delegate function
 */
-interface GTAErc20 {
+interface GTCErc20 {
     function delegateOnDist(address, address) external;
 }
 
@@ -58,7 +58,7 @@ contract TokenDistributor{
     );
 
     // typehash for our token claim - matches the Claim struct  
-    bytes32 constant GTA_TOKEN_CLAIM_TYPEHASH = keccak256(
+    bytes32 constant GTC_TOKEN_CLAIM_TYPEHASH = keccak256(
         "Claim(uint32 user_id,address user_address,uint256 user_amount,address delegate_address,bytes32 leaf)"
     );
     
@@ -217,7 +217,7 @@ contract TokenDistributor{
     **/
     function hashClaim(Claim memory claim) internal pure returns (bytes32) {
         return keccak256(abi.encode( 
-            GTA_TOKEN_CLAIM_TYPEHASH,
+            GTC_TOKEN_CLAIM_TYPEHASH,
             claim.user_id,
             claim.user_address,
             claim.user_amount, 
@@ -264,8 +264,8 @@ contract TokenDistributor{
     * @return boolean true on success 
     */
     function _delegateTokens(address delegator, address delegatee) private returns (bool) {
-         GTAErc20  GTAToken = GTAErc20(token);
-         GTAToken.delegateOnDist(delegator, delegatee);
+         GTCErc20  GTCToken = GTCErc20(token);
+         GTCToken.delegateOnDist(delegator, delegatee);
          return true;  
     } 
 
