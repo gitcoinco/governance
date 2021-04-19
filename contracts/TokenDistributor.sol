@@ -8,7 +8,7 @@ import "OpenZeppelin/openzeppelin-contracts@3.2.0/contracts/cryptography/MerkleP
 /** 
  * @title - A retroactive ERC20 token distribution contract 
  * @author - zk@WolfDefi
- * @notice - Provided an EIP712 compliant signed message & token claim, distributes GTA tokens 
+ * @notice - Provided an EIP712 compliant signed message & token claim, distributes GTC tokens 
  **/
 
 /**
@@ -82,10 +82,10 @@ contract TokenDistributor{
         deployTime = block.timestamp; 
         
         DOMAIN_SEPARATOR = hash(EIP712Domain({
-            name: "GTA",
+            name: "GTC",
             version: '1.0.0',
             chainId: 4,
-            verifyingContract: address(this)
+            verifyingContract: 0xBD2525B5F0B2a663439a78A99A06605549D25cE5
         }));
 
     }
@@ -157,7 +157,7 @@ contract TokenDistributor{
     **/
     function transferUnclaimed() public {
         require(block.timestamp >= deployTime + CONTRACT_ACTIVE, 'TokenDistributor: Contract is still active.');
-        // transfer all GTA to TimeLock
+        // transfer all GTC to TimeLock
         uint remainingBalance = IERC20(token).balanceOf(address(this));
         require(IERC20(token).transfer(timeLockContract, remainingBalance), 'TokenDistributor: Transfer unclaimed failed.');
         emit TransferUnclaimed(remainingBalance);

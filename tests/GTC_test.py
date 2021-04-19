@@ -1,6 +1,6 @@
 import pytest
 
-from brownie import GTA, accounts, web3, Wei, reverts
+from brownie import GTC, accounts, web3, Wei, reverts
 import time
 
 # First deploy the token contract, scope 'module' says to only run this fixture once
@@ -10,7 +10,7 @@ def gtc():
     account = accounts[0]
     minter = accounts[0]
     mintingAllowedAfter = int(time.time()) 
-    return GTA.deploy(account, minter, mintingAllowedAfter, {'from': accounts[0]})
+    return GTC.deploy(account, minter, mintingAllowedAfter, {'from': accounts[0]})
 
 @pytest.fixture(autouse=True)
 def isolation(fn_isolation):

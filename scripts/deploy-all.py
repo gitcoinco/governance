@@ -23,11 +23,12 @@ HOPPER_ADDRESS then needs to send to dist contract before claims will process (s
 '''
 
 # load up some envars 
-env = dotenv_values(".deploy-all-env")
+env = dotenv_values(".deploy-all-rinkeby-env")
+
 unix_time_now = time.time()
 
 # some reasonable defaults 
-treasury_vesting_begin = unix_time_now + 120 # must be greater than block timestamp of contract deploy 
+# must be greater than block timestamp of contract deploy - for rinkeby & mainnet we need this to be long enough to accommodate for slow to confirm txs 
 treasury_vesting_cliff = (60 * 60 * 24 * 7 * 12) + unix_time_now # 6 months in seconds
 treasury_vesting_end = unix_time_now + (treasury_vesting_cliff*2)
 
@@ -44,7 +45,7 @@ def main():
     **/
     ''' 
     try:
-        if env['PUBLISH_SOURCE_TO_ETHERSCAN'] == True:
+        if env['PUBLISH_SOURCE_TO_ETHERSCAN']:
             tl = Timelock.deploy(env['TIMELOCK_ADMIN'], env['TIMELOCK_DELAY'], {'from': env['DEPLOY_FROM']}, publish_source=True)
         else:
             tl = Timelock.deploy(env['TIMELOCK_ADMIN'], env['TIMELOCK_DELAY'], {'from': env['DEPLOY_FROM']})
@@ -60,12 +61,13 @@ def main():
      * @param mintingAllowedAfter_ The timestamp after which minting may occur - Just adding 2 mins for Rinkeby
     '''
     # NOTE we set minter to hopper_address temporarily so that we have permissions to set the token distr address on token contract after deploy
-    # minter is then immediately changed to the Timelock address.   
+    # minter is then immediately changed to the Timelock address.
+    minting_allowed_after = int(env['GTC_MINT_AFTER_BUFFER']) + int(unix_time_now)   
     try:
-        if env['PUBLISH_SOURCE_TO_ETHERSCAN'] == True: 
-            gta = GTA.deploy(env['HOPPER_ADDRESS'], env['HOPPER_ADDRESS'], int(unix_time_now + 120), {'from': env['DEPLOY_FROM']}, publish_source=True)
+        if env['PUBLISH_SOURCE_TO_ETHERSCAN']: 
+            gta = GTA.deploy(env['HOPPER_ADDRESS'], env['HOPPER_ADDRESS'], minting_allowed_after, {'from': env['DEPLOY_FROM']}, publish_source=True)
         else: 
-            gta = GTA.deploy(env['HOPPER_ADDRESS'], env['HOPPER_ADDRESS'], int(unix_time_now + 120), {'from': env['DEPLOY_FROM']})
+            gta = GTA.deploy(env['HOPPER_ADDRESS'], env['HOPPER_ADDRESS'], minting_allowed_after, {'from': env['DEPLOY_FROM']})
         print(f'GTA address {gta.address}')
     except Exception as e:
         print(f'Error on GTA contract deploy {e}')
@@ -75,7 +77,7 @@ def main():
     # signer address == corresponding public key (address/account) to the private key used 
     # to sign claims with Ethereum Signed Message Service  
     try:
-        if env['PUBLISH_SOURCE_TO_ETHERSCAN'] == True: 
+        if env['PUBLISH_SOURCE_TO_ETHERSCAN']: 
             td = TokenDistributor.deploy(gta.address, env['TOKEN_CLAIM_SIGNER'], tl.address, env['MERKLE_ROOT'], {'from': env['DEPLOY_FROM']}, publish_source=True)
         else:
             td = TokenDistributor.deploy(gta.address, env['TOKEN_CLAIM_SIGNER'], tl.address, env['MERKLE_ROOT'], {'from': env['DEPLOY_FROM']})
@@ -85,7 +87,7 @@ def main():
         
     # deploy the GovernorAlpha 
     try:
-        if env['PUBLISH_SOURCE_TO_ETHERSCAN'] == True:
+        if env['PUBLISH_SOURCE_TO_ETHERSCAN']:
             gov = GovernorAlpha.deploy(tl.address, gta.address, {'from' : env['DEPLOY_FROM']}, publish_source=True)
         else:
             gov = GovernorAlpha.deploy(tl.address, gta.address, {'from' : env['DEPLOY_FROM']})
@@ -93,10 +95,12 @@ def main():
         print(f'Error on GovernorAlpha deploy: {e}')
         sys.exit(1)
     
-    # deploy TresuryVesting.sol
-    # <ContractConstructor 'TreasuryVester.constructor(address gta_, address recipient_, uint256 vestingAmount_, uint256 vestingBegin_, uint256 vestingCliff_, uint256 vestingEnd_)'> 
+    # deploy TresuryVester.sol
+    # <ContractConstructor 'TreasuryVester.constructor(address gta_, address recipient_, uint256 vestingAmount_, uint256 vestingBegin_, uint256 vestingCliff_, uint256 vestingEnd_)'>
+    time_now = time.time()
+    treasury_vesting_begin = time_now + 3600
     try: 
-        if env['PUBLISH_SOURCE_TO_ETHERSCAN'] == True:
+        if env['PUBLISH_SOURCE_TO_ETHERSCAN']:
             tv = TreasuryVester.deploy(gta.address, tl.address, env['TREASURY_VESTING_AMOUNT'], treasury_vesting_begin, treasury_vesting_cliff, treasury_vesting_end, {'from' : env['DEPLOY_FROM']}, publish_source=True)
         else: 
             tv = TreasuryVester.deploy(gta.address, tl.address, env['TREASURY_VESTING_AMOUNT'], treasury_vesting_begin, treasury_vesting_cliff, treasury_vesting_end, {'from' : env['DEPLOY_FROM']})
@@ -141,7 +145,13 @@ def main():
     except Exception as e:
         print(f'Error sending coins to funders league!')
         sys.exit(1)
+    # 4) - transfer remaining coins to TreasuryVester
+    try:
+
+        gta.transfer(row[0],row[1], {'from': env['HOPPER_ADDRESS']})
+    
     """
+
  
 def transfer_to_team(gta):
     '''Transfer team coins to coinbase custody'''

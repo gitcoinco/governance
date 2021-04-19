@@ -3,13 +3,13 @@ pragma experimental ABIEncoderV2;
 
 contract GovernorAlpha {
     /// @notice The name of this contract
-    string public constant name = "GTA Governor Alpha";
+    string public constant name = "GTC Governor Alpha";
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
-    function quorumVotes() public pure returns (uint) { return 40_000_000e18; } // 4% of Gta
+    function quorumVotes() public pure returns (uint) { return 40_000_000e18; } // 4% of GTC
 
     /// @notice The number of votes required in order for a voter to become a proposer
-    function proposalThreshold() public pure returns (uint) { return 10_000_000e18; } // 1% of Gta
+    function proposalThreshold() public pure returns (uint) { return 10_000_000e18; } // 1% of GTC
 
     /// @notice The maximum number of actions that can be included in a proposal
     function proposalMaxOperations() public pure returns (uint) { return 10; } // 10 actions
@@ -20,11 +20,11 @@ contract GovernorAlpha {
     /// @notice The duration of voting on a proposal, in blocks
     function votingPeriod() public pure returns (uint) { return 40_320; } // ~7 days in blocks (assuming 15s blocks)
 
-    /// @notice The address of the Gta Protocol Timelock
+    /// @notice The address of the GTC Protocol Timelock
     TimelockInterface public timelock;
 
-    /// @notice The address of the GTA governance token
-    GTAInterface public gta;
+    /// @notice The address of the GTC governance token
+    GTCInterface public gtc;
 
     /// @notice The total number of proposals
     uint public proposalCount;
@@ -127,16 +127,16 @@ contract GovernorAlpha {
     /**
      * @notice Construct a new GovernorAlpha contract 
      * @param timelock_ - address for the TimeLock contract 
-     * @param gta_ - address of ERC20 that claims will be distributed from  
+     * @param gtc_ - address of ERC20 that claims will be distributed from  
      **/
 
-    constructor(address timelock_, address gta_) public {
+    constructor(address timelock_, address gtc_) public {
         timelock = TimelockInterface(timelock_);
-        gta = GTAInterface(gta_);
+        gtc = GTCInterface(gtc_);
     }
 
     function propose(address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas, string memory description) public returns (uint) {
-        require(gta.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold(), "GovernorAlpha::propose: proposer votes below proposal threshold");
+        require(gtc.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold(), "GovernorAlpha::propose: proposer votes below proposal threshold");
         require(targets.length == values.length && targets.length == signatures.length && targets.length == calldatas.length, "GovernorAlpha::propose: proposal function information parity mismatch");
         require(targets.length != 0, "GovernorAlpha::propose: must provide actions");
         require(targets.length <= proposalMaxOperations(), "GovernorAlpha::propose: too many actions");
@@ -206,7 +206,7 @@ contract GovernorAlpha {
         require(state != ProposalState.Executed, "GovernorAlpha::cancel: cannot cancel executed proposal");
 
         Proposal storage proposal = proposals[proposalId];
-        require(gta.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold(), "GovernorAlpha::cancel: proposer above threshold");
+        require(gtc.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold(), "GovernorAlpha::cancel: proposer above threshold");
 
         proposal.canceled = true;
         for (uint i = 0; i < proposal.targets.length; i++) {
@@ -265,7 +265,7 @@ contract GovernorAlpha {
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
         require(receipt.hasVoted == false, "GovernorAlpha::_castVote: voter already voted");
-        uint96 votes = gta.getPriorVotes(voter, proposal.startBlock);
+        uint96 votes = gtc.getPriorVotes(voter, proposal.startBlock);
 
         if (support) {
             proposal.forVotes = add256(proposal.forVotes, votes);
@@ -308,6 +308,6 @@ interface TimelockInterface {
     function executeTransaction(address target, uint value, string calldata signature, bytes calldata data, uint eta) external payable returns (bytes memory);
 }
 
-interface GTAInterface {
+interface GTCInterface {
     function getPriorVotes(address account, uint blockNumber) external view returns (uint96);
 }

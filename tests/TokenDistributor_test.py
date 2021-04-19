@@ -1,5 +1,5 @@
 import pytest
-from brownie import GTA, TokenDistributor, Timelock, accounts, web3, Wei, reverts, chain
+from brownie import GTC, TokenDistributor, Timelock, accounts, web3, Wei, reverts, chain
 import brownie
 import time
 import requests
@@ -26,12 +26,12 @@ def token():
     multiSig = accounts[0]
     minter = accounts[0]
     mintingAllowedAfter = int(time.time()) 
-    return GTA.deploy(multiSig, minter, mintingAllowedAfter, {'from': accounts[0]})
+    return GTC.deploy(multiSig, minter, mintingAllowedAfter, {'from': accounts[0]})
 
 @pytest.fixture(scope="module")
 def tl():
     '''
-        TimeLock Contract - Only needed here in the TD test as all GTA not claimed 
+        TimeLock Contract - Only needed here in the TD test as all GTC not claimed 
         can be swept to TimeLock after 6 months
     '''
     multiSig = accounts[0]
@@ -53,7 +53,7 @@ def td(token, tl):
 @pytest.fixture(scope="module")
 def set_dist_address(token, td):
     '''Token needs to know the tokenDist contract address for approved setting of delegate with different source address'''
-    return token.setGTADist(td.address, {'from': accounts[0]}) 
+    return token.setGTCDist(td.address, {'from': accounts[0]}) 
 
 @pytest.fixture(scope="module")
 def seed(token, td):
@@ -70,8 +70,8 @@ def test_valid_contract_address(token, td):
     assert web3.isChecksumAddress(token.address) and web3.isChecksumAddress(token.address), "One or more contract addresses could not be validated. Please confirm contracts we're deployed as expected."
  
 def test_dist_address_on_token(token, td):
-    token.setGTADist(td.address, {'from': accounts[0]})
-    assert token.GTADist() != '0x0000000000000000000000000000000000000000', "Token doesn't have the TokenDistribution contract address set appropriately for delegation on dist."
+    token.setGTCDist(td.address, {'from': accounts[0]})
+    assert token.GTCDist() != '0x0000000000000000000000000000000000000000', "Token doesn't have the TokenDistribution contract address set appropriately for delegation on dist."
 
 def test_valid_claim(token,td,seed,set_dist_address): 
     '''
@@ -294,7 +294,7 @@ def generate_claim(user_id, user_address, delegate_address, total_claim):
         full_response = []
         print(f'TokenDistribution test Error - {e}')
 
-    # print(f'GTA Token Distributor - ESMS response: {full_response}')
+    # print(f'GTC Token Distributor - ESMS response: {full_response}')
     return full_response 
     
 

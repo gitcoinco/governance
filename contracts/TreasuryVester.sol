@@ -5,7 +5,7 @@ import "./SafeMath.sol";
 contract TreasuryVester {
     using SafeMath for uint;
 
-    address public gta;
+    address public gtc;
     address public recipient;
 
     uint public vestingAmount;
@@ -16,7 +16,7 @@ contract TreasuryVester {
     uint public lastUpdate;
 
     constructor(
-        address gta_,
+        address gtc_,
         address recipient_,
         uint vestingAmount_,
         uint vestingBegin_,
@@ -27,7 +27,7 @@ contract TreasuryVester {
         require(vestingCliff_ >= vestingBegin_, 'TreasuryVester::constructor: cliff is too early');
         require(vestingEnd_ > vestingCliff_, 'TreasuryVester::constructor: end is too early');
 
-        gta = gta_;
+        gtc = gtc_;
         recipient = recipient_;
 
         vestingAmount = vestingAmount_;
@@ -47,16 +47,16 @@ contract TreasuryVester {
         require(block.timestamp >= vestingCliff, 'TreasuryVester::claim: not time yet');
         uint amount;
         if (block.timestamp >= vestingEnd) {
-            amount = IGta(gta).balanceOf(address(this));
+            amount = IGtc(gtc).balanceOf(address(this));
         } else {
             amount = vestingAmount.mul(block.timestamp - lastUpdate).div(vestingEnd - vestingBegin);
             lastUpdate = block.timestamp;
         }
-        IGta(gta).transfer(recipient, amount);
+        IGtc(gtc).transfer(recipient, amount);
     }
 }
 
-interface IGta {
+interface IGtc {
     function balanceOf(address account) external view returns (uint);
     function transfer(address dst, uint rawAmount) external returns (bool);
 }
