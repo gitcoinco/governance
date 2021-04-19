@@ -84,8 +84,8 @@ contract TokenDistributor{
         DOMAIN_SEPARATOR = hash(EIP712Domain({
             name: "GTC",
             version: '1.0.0',
-            chainId: 4,
-            verifyingContract: 0xBD2525B5F0B2a663439a78A99A06605549D25cE5
+            chainId: 1,
+            verifyingContract: address(this)
         }));
 
     }
