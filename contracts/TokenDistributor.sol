@@ -261,7 +261,6 @@ contract TokenDistributor{
 
     /**
     * @notice execute call on token contract to delegate tokens   
-    * @return boolean true on success 
     */
     function _delegateTokens(address delegator, address delegatee) private {
          GTCErc20  GTCToken = GTCErc20(token);
