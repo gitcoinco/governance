@@ -122,11 +122,37 @@ contract TokenDistributor{
         // claim must provide a message signed by defined <signer>  
         require(isSigned(eth_signed_message_hash_hex, eth_signed_signature_hex), 'TokenDistributor: Valid Signature Required.');
         
+        // recreate digest for base claim
+        // craft the claim object 
+        Claim memory claim = Claim({
+            user_id: user_id,
+            user_address: user_address, 
+            user_amount: user_amount, 
+            delegate_address: delegate_address, 
+            leaf: leaf
+        });
+
+        bytes32 hashed_base_claim = keccak256(abi.encode( 
+            GTC_TOKEN_CLAIM_TYPEHASH,
+            claim.user_id,
+            claim.user_address,
+            claim.user_amount, 
+            claim.delegate_address, 
+            claim.leaf
+        ));
+
+        bytes32 digest = keccak256(abi.encodePacked(
+            "\x19\x01",
+            DOMAIN_SEPARATOR,
+            hashed_base_claim
+        ));
+
         // can we reproduce the same hash from the raw claim metadata? 
-        require(hashMatch(user_id, user_address, user_amount, delegate_address, leaf, eth_signed_message_hash_hex), 'TokenDistributor: Hash Mismatch.');
+        require(digest == eth_signed_message_hash_hex, 'TokenDistributor: Claim Hash Mismatch.');
         
         // can we repoduce leaf hash included in the claim?
-        require(_hashLeaf(user_id, user_amount, leaf), 'TokenDistributor: Leaf Hash Mismatch.');
+        bytes32 leaf_hash = keccak256(abi.encodePacked(keccak256(abi.encodePacked(user_id, user_amount))));
+        require(leaf == leaf_hash, 'TokenDistributor: Leaf Hash Mismatch.');
 
         // does the leaf exist on our tree? 
         require(MerkleProof.verify(merkleProof, merkleRoot, leaf), 'TokenDistributor: Valid Proof Required.');
@@ -173,60 +199,6 @@ contract TokenDistributor{
     }
 
     /**
-    * @notice - Used to to generate message hash on-chain 
-    * @return - Bytes32 hash of the message that was signed 
-    **/
-    function getDigest(Claim memory claim) internal view returns (bytes32) {
-     
-        bytes32 digest = keccak256(abi.encodePacked(
-            "\x19\x01",
-            DOMAIN_SEPARATOR,
-            hashClaim(claim)
-        ));
-        return digest;
-    }
-   
-    /**
-    * @dev - does the user provided claim values hash up and match eth_signed_message_hash_hex?
-    * @return - boolean - true on match  
-    **/
-    function hashMatch(
-        uint32 _user_id, 
-        address _user_address, 
-        uint256 _user_amount,
-        address _delegate_address,
-        bytes32 _leaf,
-        bytes32 eth_signed_message_hash_hex 
-        ) internal returns ( bool ) {
-
-        // craft the claim object 
-        Claim memory claim = Claim({
-            user_id: _user_id,
-            user_address: _user_address, 
-            user_amount: _user_amount, 
-            delegate_address: _delegate_address, 
-            leaf: _leaf
-        });
-
-        return getDigest(claim) == eth_signed_message_hash_hex;
-    }
-
-    /**
-    * @notice - this function is used to re-create pre-signed message hash on-chain 
-    * @return - keccak256 hash of claim payload EIP712 style 
-    **/
-    function hashClaim(Claim memory claim) internal pure returns (bytes32) {
-        return keccak256(abi.encode( 
-            GTC_TOKEN_CLAIM_TYPEHASH,
-            claim.user_id,
-            claim.user_address,
-            claim.user_amount, 
-            claim.delegate_address, 
-            claim.leaf
-        ));
-    }
-
-    /**
     * @notice - function can be used to create DOMAIN_SEPARATORs
     * @dev - from EIP712 spec, unmodified 
     **/
@@ -249,15 +221,6 @@ contract TokenDistributor{
         uint256 claimedBitIndex = index % 256;
         claimedBitMap[claimedWordIndex] = claimedBitMap[claimedWordIndex] | (1 << claimedBitIndex);
     }
-
-    /**
-    * @notice hash user_id + claim amount together & compare results to leaf hash  
-    * @return boolean true on match
-    */
-    function _hashLeaf(uint32 user_id, uint256 user_amount, bytes32 leaf) private returns (bool) {
-        bytes32 leaf_hash = keccak256(abi.encodePacked(keccak256(abi.encodePacked(user_id, user_amount))));
-        return leaf == leaf_hash;
-    } 
 
     /**
     * @notice execute call on token contract to delegate tokens   
