@@ -40,15 +40,6 @@ contract TokenDistributor{
         address verifyingContract;
     }
 
-    // claim struct 
-    struct Claim {
-        uint32 user_id;
-        address user_address;
-        uint256 user_amount;
-        address delegate_address;
-        bytes32 leaf;
-    }
-
     // How long will this contract process token claims? 6 months 
     uint public constant CONTRACT_ACTIVE = 24 weeks;
 
@@ -85,7 +76,7 @@ contract TokenDistributor{
             name: "GTC",
             version: '1.0.0',
             chainId: 1,
-            verifyingContract: 0xBD2525B5F0B2a663439a78A99A06605549D25cE5
+            verifyingContract: address(this)
         }));
 
     }
@@ -122,23 +113,13 @@ contract TokenDistributor{
         // claim must provide a message signed by defined <signer>  
         require(isSigned(eth_signed_message_hash_hex, eth_signed_signature_hex), 'TokenDistributor: Valid Signature Required.');
         
-        // recreate digest for base claim
-        // craft the claim object 
-        Claim memory claim = Claim({
-            user_id: user_id,
-            user_address: user_address, 
-            user_amount: user_amount, 
-            delegate_address: delegate_address, 
-            leaf: leaf
-        });
-
         bytes32 hashed_base_claim = keccak256(abi.encode( 
             GTC_TOKEN_CLAIM_TYPEHASH,
-            claim.user_id,
-            claim.user_address,
-            claim.user_amount, 
-            claim.delegate_address, 
-            claim.leaf
+            user_id,
+            user_address,
+            user_amount, 
+            delegate_address, 
+            leaf
         ));
 
         bytes32 digest = keccak256(abi.encodePacked(
