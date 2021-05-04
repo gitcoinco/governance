@@ -5,13 +5,13 @@ import "./SafeMath.sol";
 contract TreasuryVester {
     using SafeMath for uint;
 
-    address immutable gtc;
+    address public immutable gtc;
     address public recipient;
 
-    uint immutable vestingAmount;
-    uint immutable vestingBegin;
-    uint immutable vestingCliff;
-    uint immutable vestingEnd;
+    uint public immutable vestingAmount;
+    uint public immutable vestingBegin;
+    uint public immutable vestingCliff;
+    uint public immutable vestingEnd;
 
     uint public lastUpdate;
 
