@@ -10,10 +10,26 @@ import binascii
 import csv
 import random
 import os
+import sys
 from dotenv import dotenv_values
 
 #load up envars from .env
-env = dotenv_values(".tests-env")
+env = dotenv_values(".tests-env-2")
+try: 
+    test = env['TIMELOCK_DELAY']
+except Exception as e:
+    print(f'There was an issue getting envars from file. Please check that file exists and values are correct format: {e}')
+    sys.exit(1)
+
+# confirm we can hit the ESMS
+try:
+    esms_response = requests.get(env['V1_API_URL'])
+    # we should get a 405 from GET request to POST only endpoint 
+    if (esms_response.status_code != '405'):
+        raise Exception("ESMS does not appear to be responding to requests") 
+    print(f'Response from ESMS: {esms_response.status_code}')
+except Exception as e:
+    print(f'Some tests will fail - {e}') 
 
 @pytest.fixture(scope="module")
 def token():
@@ -213,21 +229,36 @@ def test_sweep_unclaimed_drops_1(token, td, set_dist_address):
         with brownie.reverts("TokenDistributor: Contract is still active."):
             td.transferUnclaimed({'from': accounts[0]})
 
-# reusable, valid, base token claim metadata from 4/13 KO V1 initial dist  
-class ValidClaim:
+def get_claim_from_dist():
+    '''Pull back a single valid claim from initial dist list'''
+  
+    with open(env['DIST_FILE'], 'r') as csvfile:
+        initial_distribution = csv.reader(csvfile)
+        next(initial_distribution) # skip header 
+        
+        for row in initial_distribution:
+            user_id = int(row[1]) # user_id 
+            total_claim = int(row[2]) # total_claim
+            print(f'HERE: {user_id}, {total_claim}')
+            return(user_id, total_claim)
+
+# reusable, valid claim pulled from first record in initial_dist file 
+class ValidClaim:    
     def __init__(self):
-        self.user_id = 3221
+        _user_id, _total_claim = get_claim_from_dist()
+        self.user_id = _user_id
         self.claim_address = accounts[1].address 
         self.delegate_address = accounts[1].address
-        self.total_claim = 8007641666299999993856
+        self.total_claim = _total_claim
 
-# reusable, mismatched, base token claim metadata based on 4/13 KO v1 initial dist  
+# reusable, bad claim contains 2x defined total_claim 
 class BadClaim1:
     def __init__(self):
-        self.user_id = 3221
+        _user_id, _total_claim = get_claim_from_dist()
+        self.user_id = _user_id
         self.claim_address = accounts[1].address 
         self.delegate_address = accounts[1].address
-        self.total_claim = 9666666666666666666666
+        self.total_claim = _total_claim + _total_claim
 
 # for crafting full signed, token claim objects  
 class TokenClaim:
@@ -245,7 +276,6 @@ class TokenClaim:
         self.sig = raw_claim["eth_signed_signature_hex"]
         self.leaf = raw_claim["leaf"]
         self.proof = raw_claim["proof"]
-
 
 def generate_claim(user_id, user_address, delegate_address, total_claim):
     '''Mimic Quadratic Lands application by sending a claim request to the Ethereum Signed Message Service'''

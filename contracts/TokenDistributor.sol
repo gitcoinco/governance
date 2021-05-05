@@ -132,7 +132,7 @@ contract TokenDistributor{
         require(digest == eth_signed_message_hash_hex, 'TokenDistributor: Claim Hash Mismatch.');
         
         // can we repoduce leaf hash included in the claim?
-        bytes32 leaf_hash = keccak256(abi.encodePacked(keccak256(abi.encodePacked(user_id, user_amount))));
+        bytes32 leaf_hash = keccak256(abi.encode(keccak256(abi.encode(user_id, user_amount))));
         require(leaf == leaf_hash, 'TokenDistributor: Leaf Hash Mismatch.');
 
         // does the leaf exist on our tree? 
