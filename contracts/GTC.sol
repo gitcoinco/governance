@@ -263,7 +263,8 @@ contract GTC {
      * @param delegator The address to delegate votes from 
      * @param delegatee The address to delegate votes to
      */
-    function delegateOnDist(address delegator, address delegatee) external onlyBy(GTCDist) {
+    function delegateOnDist(address delegator, address delegatee) external {
+        require(msg.sender == GTCDist, "Sender not authorized");
         return _delegate(delegator, delegatee);
     }
 
@@ -417,12 +418,4 @@ contract GTC {
         return chainId;
     }
 
-    modifier onlyBy(address _account)
-    {
-        require(
-            msg.sender == _account,
-            "Sender not authorized."
-        );
-        _;
-    }
 }
