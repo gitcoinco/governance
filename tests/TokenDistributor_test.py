@@ -137,7 +137,7 @@ def test_claim_fails_with_bad_metadata(token,td,set_dist_address):
     token_claim = TokenClaim(valid_claim.user_id, valid_claim.claim_address, valid_claim.delegate_address, valid_claim.total_claim) # get signed token claim from the EMSM
     
     # should revert as we send a different claim amount than that of which was provided with the original message 
-    with brownie.reverts("TokenDistributor: Hash Mismatch."):
+    with brownie.reverts("TokenDistributor: Claim Hash Mismatch."):
         td.claimTokens(token_claim.user_id, token_claim.user_address, 1223943873000000061440, token_claim.delegate_address, token_claim.hash, token_claim.sig, token_claim.proof, token_claim.leaf, {'from' : token_claim.user_address})
 
 def test_wrong_user(token,td,set_dist_address): 
