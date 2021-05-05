@@ -5,13 +5,13 @@ import "./SafeMath.sol";
 contract TreasuryVester {
     using SafeMath for uint;
 
-    address public gtc;
+    address public immutable gtc;
     address public recipient;
 
-    uint public vestingAmount;
-    uint public vestingBegin;
-    uint public vestingCliff;
-    uint public vestingEnd;
+    uint public immutable vestingAmount;
+    uint public immutable vestingBegin;
+    uint public immutable vestingCliff;
+    uint public immutable vestingEnd;
 
     uint public lastUpdate;
 
@@ -35,7 +35,7 @@ contract TreasuryVester {
         vestingCliff = vestingCliff_;
         vestingEnd = vestingEnd_;
 
-        lastUpdate = vestingBegin;
+        lastUpdate = vestingBegin_;
     }
 
     function setRecipient(address recipient_) public {
