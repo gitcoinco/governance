@@ -41,7 +41,7 @@ contract TokenDistributor{
     }
 
     // How long will this contract process token claims? 6 months 
-    uint public constant CONTRACT_ACTIVE = 24 weeks;
+    uint public constant CONTRACT_ACTIVE = 30 days;
 
     // as required by EIP712, we create type hash that will be rolled up into the final signed message
     bytes32 constant EIP712DOMAIN_TYPEHASH = keccak256(
