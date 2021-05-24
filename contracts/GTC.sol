@@ -14,7 +14,7 @@ contract GTC {
     uint8 public constant decimals = 18;
 
     /// @notice Total number of tokens in circulation
-    uint public totalSupply = 3_000_000e18; // 3 million GTC
+    uint public totalSupply = 100_000_000e18; // 100 million GTC
 
     /// @notice Address which may mint new tokens
     address public minter;

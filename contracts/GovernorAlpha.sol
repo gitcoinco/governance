@@ -6,16 +6,16 @@ contract GovernorAlpha {
     string public constant name = "GTC Governor Alpha";
 
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
-    function quorumVotes() public pure returns (uint) { return 75_000e18; } // 4% of GTC
+    function quorumVotes() public pure returns (uint) { return 2_500_000e18; } // 2.5% of GTC
 
     /// @notice The number of votes required in order for a voter to become a proposer
-    function proposalThreshold() public pure returns (uint) { return 30_000e18; } // 1% of GTC
+    function proposalThreshold() public pure returns (uint) { return 1_000_000e18; } // 1% of GTC
 
     /// @notice The maximum number of actions that can be included in a proposal
     function proposalMaxOperations() public pure returns (uint) { return 10; } // 10 actions
 
     /// @notice The delay before voting on a proposal may take place, once proposed
-    function votingDelay() public pure returns (uint) { return 13000; } // 1 block
+    function votingDelay() public pure returns (uint) { return 13140; } // ~2 days in blocks (assuming 15s blocks)
 
     /// @notice The duration of voting on a proposal, in blocks
     function votingPeriod() public pure returns (uint) { return 40_320; } // ~7 days in blocks (assuming 15s blocks)
