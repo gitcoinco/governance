@@ -1,0 +1,47 @@
+# deploy-all.py local envars
+# local deployment addresses below can be re-created with the following mnemonic:
+# guilt hero burger wagon very illness acoustic miracle vehicle amount float parade 
+
+### MISC constructor/deploy parameters  
+PUBLISH_SOURCE_TO_ETHERSCAN=False # True to auto verify contract source on Etherscan, False for local ganache-cli deployment 
+DEPLOY_FROM='0xA1df472Fc3d9f9E5F54137D2878A3fA8adB63351' # what account should the contracts be deployed from? 
+HOPPER_ADDRESS='0xA1df472Fc3d9f9E5F54137D2878A3fA8adB63351' # all tokens will be minted to this address initially before being transferred accordingly
+
+### MISC deploy 
+TEAM_DIST='./scripts/team.csv' # addresses to distribute team coins to
+FUNDERS_DIST='./scripts/funders.csv' # addresses to distribute funder coins to
+INITIAL_MINT = 100000000 # 100mm in units GTC/ETH (script will convert to WEI)
+
+### Timelock constructors 
+TIMELOCK_ADMIN='0xA1df472Fc3d9f9E5F54137D2878A3fA8adB63351' # temp set to valid address for now
+TIMELOCK_DELAY=172800 # 2 days in seconds (min required)
+
+### GTC.sol constructor
+GTC_MINT_AFTER=1641020400 # unix timestamp after which minting may occur
+
+### Tokendistributor.sol  
+TOKEN_CLAIM_SIGNER='' # Pub-key/address for account used to sign token claims 
+MERKLE_ROOT='' # merkle root of the profile ID + claim amount tree 
+
+# TreasuryVester.sol
+TREASURY_VESTING_AMOUNT=50000000 # 50mm in units GTC (script will convert to WEI)
+TREASURY_VESTING_BEGIN=1630783939 # random date way out 
+TREASURY_VESTING_CLIFF=1630783939 # random date way out 
+TREASURY_VESTING_END=1640783939 # random date way out plus some
+
+### Hardcoded Contract Params
+# If VALIDATE_PARAMS=True, the script will check constructor params against hardcoded contract params 
+# and proactively alert/notify of potential issues & bail instead of failing contract deploy 
+
+VALIDATE_PARAMS=True
+
+# Timelock.sol - Gitcoin production values 
+# uint public constant GRACE_PERIOD = 14 days;
+# uint public constant MINIMUM_DELAY = 2 days;
+# uint public constant MAXIMUM_DELAY = 30 days;
+MINIMUM_DELAY = 172800 # 2 days in seconds 
+MAXIMUM_DELAY = 2592000 # 30 days in seconds
+
+
+
+
