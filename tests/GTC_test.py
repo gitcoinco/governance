@@ -73,7 +73,7 @@ class MintInfo:
         self.minter = gtc.minter
         self.total_supply = gtc.totalSupply()
         self.mint_cap = gtc.mintCap()
-        self.max_mint_amount =  self.mint_cap/100 * self.total_supply 
+        self.max_mint_amount = (self.mint_cap * self.total_supply) / 100
         self.before_mint = gtc.balanceOf(_account)
         
 
