@@ -1,0 +1,6 @@
+TIMELOCK_DELAY='172800'
+V1_API_URL='https://<ethereum-signed-messager-service-url>'
+DEV_HMAC_KEY='<your-key-here>' 
+SIGNING_ADDRESS='<eth-address-used-to-sign-claims'
+MERKLE_ROOT='<merkle-root-of-intitial-dist.csv>'
+DIST_FILE='./tests/initial_dist.csv'
